@@ -184,7 +184,6 @@ def eliminar_movimiento(id):
     conn.commit()
     conn.close()
 
-# ── Ahorro ──
 def crear_meta(nombre, objetivo, fecha_limite):
     conn = sqlite3.connect("data/gastos.db")
     cursor = conn.cursor()
@@ -242,11 +241,12 @@ METODOS_PAGO = ["Efectivo", "Tarjeta débito", "Tarjeta crédito", "Nequi", "Dav
 # ── UI ──
 st.title("💰 Gestor de Gastos")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Agregar", "Resumen", "Historial", "🐷 Ahorro", "⚙️ Configuración"])
+st.sidebar.title("📋 Menú")
+pagina = st.sidebar.radio("", ["➕ Agregar", "📊 Resumen", "📋 Historial", "🐷 Ahorro", "⚙️ Configuración"])
 
 CATEGORIAS = obtener_categorias()
 
-with tab1:
+if pagina == "➕ Agregar":
     st.subheader("Agregar movimiento")
     tipo = st.selectbox("Tipo:", ["Gasto", "Ingreso"])
     categoria = st.selectbox("Categoría:", CATEGORIAS) if tipo == "Gasto" else "Ingreso"
@@ -261,7 +261,7 @@ with tab1:
         else:
             st.warning("Completa los campos obligatorios")
 
-with tab2:
+elif pagina == "📊 Resumen":
     st.subheader("Resumen")
     ingresos_total, gastos_total, gastos_hoy, gastos_mes, ingresos_mes = obtener_resumen()
     balance = ingresos_total - gastos_total
@@ -321,7 +321,7 @@ with tab2:
                            color_discrete_sequence=["#e74c3c"])
             st.plotly_chart(fig3, use_container_width=True)
 
-with tab3:
+elif pagina == "📋 Historial":
     st.subheader("Historial")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -346,10 +346,9 @@ with tab3:
     else:
         st.info("No hay movimientos con esos filtros")
 
-with tab4:
+elif pagina == "🐷 Ahorro":
     st.subheader("🐷 Metas de Ahorro")
 
-    # Crear meta
     with st.expander("➕ Crear nueva meta"):
         nombre_meta = st.text_input("Nombre de la meta (ej: Vacaciones):")
         objetivo_meta = st.number_input("Monto objetivo:", min_value=0.0, step=10000.0)
@@ -362,7 +361,6 @@ with tab4:
             else:
                 st.warning("Completa todos los campos")
 
-    # Mostrar metas
     df_metas = obtener_metas()
     if not df_metas.empty:
         for _, meta in df_metas.iterrows():
@@ -378,7 +376,6 @@ with tab4:
                 st.progress(porcentaje)
                 st.write(f"**{porcentaje*100:.1f}%** completado")
 
-                # Agregar aporte
                 col1, col2 = st.columns(2)
                 with col1:
                     monto_aporte = st.number_input("Aporte:", min_value=0.0, step=10000.0, key=f"aporte_{meta['id']}")
@@ -392,7 +389,6 @@ with tab4:
                     else:
                         st.warning("Ingresa un monto")
 
-                # Gráfica evolución
                 df_aportes = obtener_aportes_meta(meta["id"])
                 if not df_aportes.empty:
                     df_aportes["acumulado"] = df_aportes["monto"].cumsum()
@@ -403,7 +399,6 @@ with tab4:
                                   annotation_text="Objetivo")
                     st.plotly_chart(fig, use_container_width=True)
 
-                # Eliminar meta
                 if st.button("🗑️ Eliminar meta", key=f"del_{meta['id']}"):
                     eliminar_meta(meta["id"])
                     st.success("Meta eliminada")
@@ -411,7 +406,7 @@ with tab4:
     else:
         st.info("No tienes metas de ahorro aún. ¡Crea una!")
 
-with tab5:
+elif pagina == "⚙️ Configuración":
     st.subheader("⚙️ Configuración")
 
     st.markdown("### 🗂️ Categorías")
