@@ -241,6 +241,88 @@ METODOS_PAGO = ["Efectivo", "Tarjeta débito", "Tarjeta crédito", "Nequi", "Dav
 # ── UI ──
 st.title("💰 Gestor de Gastos")
 
+st.markdown("""
+    <style>
+        /* Fondo principal */
+        .stApp {
+            background-color: #0e1117;
+        }
+        
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background-color: #1a1f2e;
+            border-right: 2px solid #3498db;
+        }
+        
+        /* Título principal */
+        h1 {
+            color: #3498db;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+        
+        /* Subtítulos */
+        h2, h3 {
+            color: #ffffff;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
+        }
+        
+        /* Botones */
+        .stButton > button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 20px;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        
+        .stButton > button:hover {
+            background-color: #2980b9;
+            transform: scale(1.02);
+        }
+
+        /* Métricas */
+        [data-testid="stMetric"] {
+            background-color: #1a1f2e;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #3498db;
+        }
+
+        /* Inputs */
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {
+            background-color: #1a1f2e;
+            color: white;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+        }
+
+        /* Selectbox */
+        .stSelectbox > div > div {
+            background-color: #1a1f2e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+        }
+
+        /* Expander */
+        .streamlit-expanderHeader {
+            background-color: #1a1f2e;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+        }
+
+        /* Divider */
+        hr {
+            border-color: #3498db;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 st.sidebar.title("📋 Menú")
 pagina = st.sidebar.radio("", ["➕ Agregar", "📊 Resumen", "📋 Historial", "🐷 Ahorro", "⚙️ Configuración"])
 
