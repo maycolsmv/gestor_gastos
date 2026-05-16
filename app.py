@@ -34,7 +34,24 @@ def init_db():
             limite REAL
         )
     ''')
-    # Insertar categorías por defecto si la tabla está vacía
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS metas_ahorro (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT UNIQUE,
+            objetivo REAL,
+            fecha_limite TEXT
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS aportes_ahorro (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            meta_id INTEGER,
+            monto REAL,
+            nota TEXT,
+            fecha TEXT,
+            FOREIGN KEY (meta_id) REFERENCES metas_ahorro(id)
+        )
+    ''')
     cursor.execute("SELECT COUNT(*) FROM categorias")
     if cursor.fetchone()[0] == 0:
         defaults = ["Comida", "Transporte", "Vivienda", "Salud", "Educación", "Entretenimiento", "Ropa", "Otros"]
@@ -167,6 +184,55 @@ def eliminar_movimiento(id):
     conn.commit()
     conn.close()
 
+# ── Ahorro ──
+def crear_meta(nombre, objetivo, fecha_limite):
+    conn = sqlite3.connect("data/gastos.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO metas_ahorro (nombre, objetivo, fecha_limite) VALUES (?, ?, ?)",
+                   (nombre, objetivo, fecha_limite))
+    conn.commit()
+    conn.close()
+
+def obtener_metas():
+    conn = sqlite3.connect("data/gastos.db")
+    df = pd.read_sql_query("SELECT * FROM metas_ahorro", conn)
+    conn.close()
+    return df
+
+def agregar_aporte(meta_id, monto, nota):
+    conn = sqlite3.connect("data/gastos.db")
+    cursor = conn.cursor()
+    fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT INTO aportes_ahorro (meta_id, monto, nota, fecha) VALUES (?, ?, ?, ?)",
+                   (meta_id, monto, nota, fecha))
+    conn.commit()
+    conn.close()
+
+def obtener_total_aportado(meta_id):
+    conn = sqlite3.connect("data/gastos.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT SUM(monto) FROM aportes_ahorro WHERE meta_id=?", (meta_id,))
+    total = cursor.fetchone()[0] or 0
+    conn.close()
+    return total
+
+def obtener_aportes_meta(meta_id):
+    conn = sqlite3.connect("data/gastos.db")
+    df = pd.read_sql_query("""
+        SELECT fecha, monto, nota FROM aportes_ahorro 
+        WHERE meta_id=? ORDER BY fecha
+    """, conn, params=(meta_id,))
+    conn.close()
+    return df
+
+def eliminar_meta(meta_id):
+    conn = sqlite3.connect("data/gastos.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM aportes_ahorro WHERE meta_id=?", (meta_id,))
+    cursor.execute("DELETE FROM metas_ahorro WHERE id=?", (meta_id,))
+    conn.commit()
+    conn.close()
+
 # ── Inicializar ──
 os.makedirs("data", exist_ok=True)
 init_db()
@@ -176,7 +242,7 @@ METODOS_PAGO = ["Efectivo", "Tarjeta débito", "Tarjeta crédito", "Nequi", "Dav
 # ── UI ──
 st.title("💰 Gestor de Gastos")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Agregar", "Resumen", "Historial", "⚙️ Configuración"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Agregar", "Resumen", "Historial", "🐷 Ahorro", "⚙️ Configuración"])
 
 CATEGORIAS = obtener_categorias()
 
@@ -211,7 +277,6 @@ with tab2:
 
     st.divider()
 
-    # Presupuestos
     df_presupuestos = obtener_presupuestos()
     if not df_presupuestos.empty:
         st.subheader("🎯 Presupuestos del mes")
@@ -230,10 +295,8 @@ with tab2:
                 st.progress(porcentaje)
             with col2:
                 st.write(f"${gastado:,.0f} / ${limite:,.0f}")
-
         st.divider()
 
-    # Gráficas
     st.subheader("Gastos por categoría")
     df_cat = obtener_por_categoria()
     if not df_cat.empty:
@@ -284,9 +347,73 @@ with tab3:
         st.info("No hay movimientos con esos filtros")
 
 with tab4:
+    st.subheader("🐷 Metas de Ahorro")
+
+    # Crear meta
+    with st.expander("➕ Crear nueva meta"):
+        nombre_meta = st.text_input("Nombre de la meta (ej: Vacaciones):")
+        objetivo_meta = st.number_input("Monto objetivo:", min_value=0.0, step=10000.0)
+        fecha_limite_meta = st.date_input("Fecha límite:")
+        if st.button("Crear meta"):
+            if nombre_meta and objetivo_meta > 0:
+                crear_meta(nombre_meta, objetivo_meta, str(fecha_limite_meta))
+                st.success(f"Meta '{nombre_meta}' creada correctamente")
+                st.rerun()
+            else:
+                st.warning("Completa todos los campos")
+
+    # Mostrar metas
+    df_metas = obtener_metas()
+    if not df_metas.empty:
+        for _, meta in df_metas.iterrows():
+            total_aportado = obtener_total_aportado(meta["id"])
+            objetivo = meta["objetivo"]
+            porcentaje = min(total_aportado / objetivo, 1.0) if objetivo > 0 else 0
+
+            with st.expander(f"🎯 {meta['nombre']} — ${total_aportado:,.0f} / ${objetivo:,.0f}"):
+                if porcentaje >= 1.0:
+                    st.success("🎉 ¡Meta alcanzada!")
+                else:
+                    st.write(f"📅 Fecha límite: {meta['fecha_limite']}")
+                st.progress(porcentaje)
+                st.write(f"**{porcentaje*100:.1f}%** completado")
+
+                # Agregar aporte
+                col1, col2 = st.columns(2)
+                with col1:
+                    monto_aporte = st.number_input("Aporte:", min_value=0.0, step=10000.0, key=f"aporte_{meta['id']}")
+                with col2:
+                    nota_aporte = st.text_input("Nota:", key=f"nota_{meta['id']}")
+                if st.button("Agregar aporte", key=f"btn_{meta['id']}"):
+                    if monto_aporte > 0:
+                        agregar_aporte(meta["id"], monto_aporte, nota_aporte)
+                        st.success(f"Aporte de ${monto_aporte:,.0f} agregado")
+                        st.rerun()
+                    else:
+                        st.warning("Ingresa un monto")
+
+                # Gráfica evolución
+                df_aportes = obtener_aportes_meta(meta["id"])
+                if not df_aportes.empty:
+                    df_aportes["acumulado"] = df_aportes["monto"].cumsum()
+                    fig = px.line(df_aportes, x="fecha", y="acumulado", markers=True,
+                                  title="Evolución del ahorro",
+                                  color_discrete_sequence=["#2ecc71"])
+                    fig.add_hline(y=objetivo, line_dash="dash", line_color="red",
+                                  annotation_text="Objetivo")
+                    st.plotly_chart(fig, use_container_width=True)
+
+                # Eliminar meta
+                if st.button("🗑️ Eliminar meta", key=f"del_{meta['id']}"):
+                    eliminar_meta(meta["id"])
+                    st.success("Meta eliminada")
+                    st.rerun()
+    else:
+        st.info("No tienes metas de ahorro aún. ¡Crea una!")
+
+with tab5:
     st.subheader("⚙️ Configuración")
 
-    # Categorías
     st.markdown("### 🗂️ Categorías")
     col1, col2 = st.columns(2)
     with col1:
@@ -307,7 +434,6 @@ with tab4:
 
     st.divider()
 
-    # Presupuestos
     st.markdown("### 🎯 Presupuestos mensuales")
     cat_presupuesto = st.selectbox("Categoría:", CATEGORIAS, key="pres_cat")
     limite = st.number_input("Límite mensual:", min_value=0.0, step=10000.0, key="pres_limite")
