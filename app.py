@@ -324,9 +324,49 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.sidebar.title("📋 Menú")
-pagina = st.sidebar.radio("", ["➕ Agregar", "📊 Resumen", "📋 Historial", "🐷 Ahorro", "⚙️ Configuración"])
+pagina = st.sidebar.radio("", ["🏠 Inicio", "➕ Agregar", "📊 Resumen", "📋 Historial", "🐷 Ahorro", "⚙️ Configuración"])
 
 CATEGORIAS = obtener_categorias()
+
+if pagina == "🏠 Inicio":
+    st.markdown("## Bienvenido 👋")
+    st.markdown("Tu app personal para controlar gastos, ingresos y metas de ahorro.")
+    st.divider()
+
+    # Resumen rápido
+    ingresos_total, gastos_total, gastos_hoy, gastos_mes, ingresos_mes = obtener_resumen()
+    balance = ingresos_total - gastos_total
+
+    st.markdown("### 📊 Resumen rápido")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("💵 Balance", f"${balance:,.0f}")
+    col2.metric("📅 Gastos hoy", f"${gastos_hoy:,.0f}")
+    col3.metric("🗓️ Gastos este mes", f"${gastos_mes:,.0f}")
+
+    st.divider()
+
+    # Últimos movimientos
+    st.markdown("### 🕒 Últimos movimientos")
+    df = obtener_movimientos()
+    if not df.empty:
+        st.dataframe(df.head(5), use_container_width=True)
+    else:
+        st.info("No hay movimientos registrados aún")
+
+    st.divider()
+
+    # Metas de ahorro
+    st.markdown("### 🐷 Metas de ahorro")
+    df_metas = obtener_metas()
+    if not df_metas.empty:
+        for _, meta in df_metas.iterrows():
+            total_aportado = obtener_total_aportado(meta["id"])
+            objetivo = meta["objetivo"]
+            porcentaje = min(total_aportado / objetivo, 1.0) if objetivo > 0 else 0
+            st.write(f"🎯 {meta['nombre']} — {porcentaje*100:.1f}%")
+            st.progress(porcentaje)
+    else:
+        st.info("No tienes metas de ahorro aún")
 
 if pagina == "➕ Agregar":
     st.subheader("Agregar movimiento")
